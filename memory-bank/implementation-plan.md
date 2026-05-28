@@ -18,7 +18,7 @@
 ---
 
 ### 步骤 1.2：初始化后端Python环境
-**指令**：在 backend 目录下创建 requirements.txt 文件，内容严格按照 `memory-bank/tech-stack.md` 中定义的依赖版本。额外添加加密和安全相关依赖：`cryptography`、`pytest`。创建 `.env.example` 文件作为环境变量模板，包含 `ENCRYPTION_KEY` 和 `DATABASE_URL` 变量。
+**指令**：在 backend 目录下创建 requirements.txt 文件，内容严格按照 `memory-bank/tech-stack.md` 中定义的依赖版本。创建 `.env.example` 文件作为环境变量模板，包含 `ENCRYPTION_KEY` 和 `DATABASE_URL` 变量。
 
 **验证**：
 - 运行 `pip install -r backend/requirements.txt` 确认所有依赖可正常安装
@@ -27,7 +27,7 @@
 ---
 
 ### 步骤 1.3：初始化前端项目
-**指令**：在 frontend 目录下使用 Vite 创建 React+TypeScript 项目，安装 `memory-bank/tech-stack.md` 中列出的所有依赖。额外添加测试依赖：`jest`、`@testing-library/react`、`@testing-library/jest-dom`。配置 Tailwind CSS、ESLint 和 Prettier。
+**指令**：在 frontend 目录下使用 Vite 创建 React+TypeScript 项目，安装 `memory-bank/tech-stack.md` 中列出的所有依赖。配置 Tailwind CSS、ESLint 和 Prettier。
 
 **验证**：
 - 运行 `npm run dev` 确认开发服务器可正常启动
@@ -39,17 +39,41 @@
 ## 阶段二：后端基础架构
 
 ### 步骤 2.1：创建加密工具模块
-**指令**：在 `backend/app/utils/crypto.py` 中创建数据加密工具类 `DataEncryptor`，使用 AES-256-GCM 实现加密和解密功能。参考 `/research/database-security-storage.md` 中的实现方案。支持字符串的加密存储和解密读取。
+**指令**：在 `backend/app/utils/crypto.py` 中创建数据加密工具类 `DataEncryptor`，使用 Fernet（AES-128-CBC + HMAC）实现加密和解密功能。参考 `/research/database-security-storage.md` 中的实现方案。
+
+**信息安全知识点**：
+- 对称加密原理
+- 加密与认证（Authenticated Encryption）
+- 密钥管理最佳实践
+
+**实现要点**：
+```python
+class DataEncryptor:
+    def __init__(self):
+        # 从环境变量读取密钥，未设置则报错退出
+        key = os.getenv('ENCRYPTION_KEY')
+        if not key:
+            raise ValueError("ENCRYPTION_KEY环境变量未设置")
+        self.cipher = Fernet(key.encode())
+    
+    def encrypt(self, plaintext: str) -> str: ...
+    def decrypt(self, ciphertext: str) -> str: ...
+```
 
 **验证**：
 - 编写单元测试，验证加密后的密文可正确解密还原
 - 测试空字符串处理
 - 测试中文内容加密解密
+- 测试未设置密钥时抛出正确异常
 
 ---
 
 ### 步骤 2.2：创建FastAPI应用入口
 **指令**：在 `backend/app/main.py` 中创建 FastAPI 应用实例，配置 CORS 中间件允许前端访问（允许 `localhost:3000`），添加基本的健康检查端点 `/health`。从环境变量读取配置。
+
+**信息安全知识点**：
+- CORS（跨域资源共享）安全配置
+- 最小权限原则（仅允许可信源）
 
 **验证**：
 - 运行 `uvicorn app.main:app --reload` 启动服务
@@ -71,17 +95,18 @@
 **指令**：在 `backend/app/models/detection.py` 中定义 DetectionHistory 模型，字段包括：
 - `id`（主键）
 - `input_content_encrypted`（加密后的输入内容）
-- `detection_type`（字符串）
-- `risk_level`（字符串）
+- `detection_type`（字符串：phishing/weak_password/sensitive_info/all）
+- `risk_level`（字符串：high/medium/low/safe）
 - `result_detail_encrypted`（加密后的检测结果JSON）
 - `created_at`（时间戳）
 
-使用 `backend/app/utils/crypto.py` 中的 `DataEncryptor` 实现字段的自动加密解密。
+**信息安全知识点**：
+- 数据分类与分级
+- 敏感字段识别与保护
 
 **验证**：
 - 启动应用后使用 SQLite Browser 检查表结构是否正确创建
-- 确认敏感字段存储为密文形式
-- 测试读取时能正确解密
+- 确认敏感字段命名包含 `_encrypted` 后缀
 
 ---
 
@@ -90,7 +115,11 @@
 - `DetectRequest`：content（字符串）、detection_type（可选枚举：phishing/weak_password/sensitive_info）
 - `DetectResponse`：success（布尔）、result（字典）
 - `HistoryItem`：id、detection_type、risk_level、created_at（不返回敏感的input_content）
-- `HistoryList`：HistoryItem 列表
+- `HistoryList`：HistoryItem 列表，包含分页信息
+
+**信息安全知识点**：
+- 输入验证（Input Validation）
+- 最小化数据暴露原则
 
 **验证**：
 - 编写 pytest 测试，导入模型创建实例确认字段验证正常
@@ -102,20 +131,30 @@
 ## 阶段三：检测器实现
 
 ### 步骤 3.1：实现敏感信息检测器
-**指令**：在 `backend/app/detectors/sensitive_info.py` 中实现敏感信息检测器。参考 `/research/sensitive-data-masking.md` 中的正则模式和掩码方案。
+**指令**：在 `backend/app/detectors/sensitive_info.py` 中实现敏感信息检测器，采用"正则+规则引擎"方案。参考 `/research/sensitive-data-masking.md` 和 GitHub项目 earlybird 的设计。
+
+**信息安全知识点**：
+- PII（个人身份信息）识别
+- DLP（数据泄露防护）基础
+- 正则表达式在安全检测中的应用
 
 **检测类型**：
-- API密钥：OpenAI（sk-开头）、AWS（AKIA开头）、GitHub（ghp_开头）等
-- 邮箱地址
-- 手机号（中国11位）
-- 身份证号
-- 密码字段（password=、pwd= 等）
-- JWT Token（eyJ开头）
+
+| 优先级 | 类型 | 正则模式示例 |
+|-------|------|-------------|
+| P0 | OpenAI API密钥 | `sk-[a-zA-Z0-9]{20,}` |
+| P0 | AWS密钥 | `AKIA[0-9A-Z]{16}` |
+| P0 | GitHub Token | `ghp_[a-zA-Z0-9]{36}` |
+| P0 | JWT Token | `eyJ[a-zA-Z0-9-_]+\.` |
+| P0 | 密码字段 | `password\s*[=:]\s*\S+` |
+| P1 | 邮箱地址 | `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}` |
+| P1 | 手机号(中国) | `1[3-9]\d{9}` |
+| P2 | 身份证号 | `\d{17}[\dXx]` |
 
 **返回内容**：
 - 检测到的敏感信息类型
 - 掩码后的值（如 `sk-proj-****xyz`）
-- 位置信息
+- 位置信息（start, end）
 - 风险等级
 - 掩码建议
 
@@ -128,60 +167,108 @@
 ---
 
 ### 步骤 3.2：实现弱密码检测器
-**指令**：在 `backend/app/detectors/weak_password.py` 中实现简化版弱密码检测器。参考 `/research/password-strength-detection.md` 中的设计方案，不直接调用 zxcvbn，而是自行实现评分机制。
+**指令**：在 `backend/app/detectors/weak_password.py` 中实现弱密码检测器，直接调用 zxcvbn-python 库。参考 `/research/password-strength-detection.md`。
 
-**检测规则**：
-1. 长度检查（<6扣2分，6-7扣1分，8-11正常，12-15加1分，≥16加2分）
-2. 字符类型检查（大写+1，数字+1，特殊字符+2）
-3. 常见弱密码黑名单检测（扣3分）
-4. 键盘序列检测（qwerty、asdf等，扣2分）
-5. 纯数字/纯字母检测（扣1-2分）
+**信息安全知识点**：
+- 密码学基础：熵值（Entropy）
+- 密码攻击方式：暴力破解、字典攻击、模式匹配
+- 密码强度评估原理
+
+**实现要点**：
+```python
+from zxcvbn import zxcvbn
+
+def detect(password: str) -> DetectionResult:
+    result = zxcvbn(password)
+    score = result['score']  # 0-4
+    # 转换为风险等级
+    risk_level = ['high', 'high', 'medium', 'low', 'low'][score]
+    ...
+```
 
 **返回内容**：
 - 强度评分（0-4）
 - 风险等级
 - 熵值估算
+- 破解时间
 - 具体反馈列表
 - 改进建议列表
-
-**注意**：检测结果不保存用户输入的密码原文，仅保存评分和建议。
 
 **验证**：
 - 编写 pytest 测试
 - 输入 "password123"，确认返回高风险评分
 - 输入 "Tr0ub4dor&3App!"，确认返回低风险评分
 - 输入空字符串，确认正确处理边界情况
-- 验证评分计算逻辑正确
 
 ---
 
 ### 步骤 3.3：准备钓鱼邮件训练数据
-**指令**：创建 `backend/data/training/` 目录，准备钓鱼邮件检测的训练数据：
-1. 创建 `phishing_samples.txt`，包含至少100条中文钓鱼邮件样本
-2. 创建 `normal_samples.txt`，包含至少100条正常邮件样本
-3. 创建 `phishing_keywords.txt`，整理中文钓鱼词汇列表（紧迫词汇、威胁词汇、诱导词汇等）
+**指令**：创建 `backend/data/training/` 目录，准备钓鱼邮件检测的训练数据，使用CSV格式（便于扩展）：
+
+1. 创建 `phishing_emails.csv`，包含钓鱼邮件样本
+   - 列：id, text, label(=1)
+2. 创建 `normal_emails.csv`，包含正常邮件样本
+   - 列：id, text, label(=0)
+3. 创建 `phishing_keywords.json`，整理中文钓鱼词汇分类
 
 参考 `/research/phishing-detection-nlp.md` 中的词汇分类。
 
+**信息安全知识点**：
+- 社会工程学（Social Engineering）
+- 钓鱼攻击心理学原理
+- 中文钓鱼邮件特征分析
+
 **验证**：
-- 检查样本文件格式正确
-- 确认词汇列表包含必要的分类
+- 检查CSV文件格式正确
+- 确认词汇列表包含必要的分类（紧迫性、威胁性、诱导性、伪装性）
 
 ---
 
-### 步骤 3.4：实现钓鱼邮件检测器
-**指令**：在 `backend/app/detectors/phishing.py` 中实现钓鱼邮件检测器。参考 `/research/phishing-detection-nlp.md` 中的技术方案。
+### 步骤 3.4：训练钓鱼邮件检测模型
+**指令**：创建 `backend/scripts/train_phishing_model.py`，使用 scikit-learn 训练模型：
+
+**信息安全知识点**：
+- 机器学习在安全领域的应用
+- TF-IDF文本特征提取
+- 分类模型评估指标
 
 **实现流程**：
-1. 使用 jieba 进行中文分词
-2. 使用 scikit-learn 的 TfidfVectorizer 提取文本特征
-3. 使用 scikit-learn 训练分类模型（推荐 RandomForest 或 NaiveBayes）
-4. 模型训练后保存为文件，启动时加载
+1. 读取训练数据（CSV格式）
+2. 使用 jieba 进行中文分词
+3. 使用 TfidfVectorizer 提取文本特征
+4. 训练 RandomForest 分类器
+5. 保存模型和向量化器到 `data/models/` 目录（joblib格式）
 
-**特征提取**：
-- TF-IDF 特征
-- 词汇特征（紧迫词汇计数、威胁词汇计数）
-- 文本长度特征
+**验证**：
+- 运行训练脚本，确认生成模型文件
+- 模型文件路径：`data/models/phishing_model.joblib`
+- 向量化器路径：`data/models/tfidf_vectorizer.joblib`
+
+---
+
+### 步骤 3.5：实现钓鱼邮件检测器
+**指令**：在 `backend/app/detectors/phishing.py` 中实现钓鱼邮件检测器，加载预训练模型进行检测。参考 `/research/phishing-detection-nlp.md`。
+
+**信息安全知识点**：
+- NLP在钓鱼检测中的应用
+- 模型推理流程
+- 置信度与阈值设置
+
+**实现要点**：
+```python
+class PhishingDetector(BaseDetector):
+    def __init__(self):
+        self.model = joblib.load('data/models/phishing_model.joblib')
+        self.vectorizer = joblib.load('data/models/tfidf_vectorizer.joblib')
+    
+    def detect(self, content: str) -> DetectionResult:
+        words = jieba.cut(content)
+        text = ' '.join(words)
+        features = self.vectorizer.transform([text])
+        prediction = self.model.predict(features)[0]
+        proba = self.model.predict_proba(features)[0]
+        ...
+```
 
 **返回内容**：
 - 风险等级（高/中/低）
@@ -193,12 +280,11 @@
 - 编写 pytest 测试
 - 输入包含 "立即点击链接验证账户" 的文本，确认返回高风险
 - 输入正常商务邮件文本，确认返回低风险
-- 测试分词结果正确
-- 验证模型预测输出格式
+- 测试模型文件不存在时的错误处理
 
 ---
 
-### 步骤 3.5：创建检测器工厂
+### 步骤 3.6：创建检测器工厂
 **指令**：在 `backend/app/detectors/__init__.py` 中创建检测器工厂函数和统一的检测器接口。
 
 **接口定义**：
@@ -206,7 +292,9 @@
 class DetectionResult:
     type: str           # 检测类型
     risk_level: str     # 风险等级: high/medium/low/safe
+    confidence: float   # 置信度
     details: dict       # 详细结果
+    suggestions: list   # 安全建议
 
 class BaseDetector:
     def detect(self, content: str) -> DetectionResult
@@ -214,7 +302,7 @@ class BaseDetector:
 
 **工厂函数**：
 - `get_detector(detection_type: str) -> BaseDetector`
-- `detect_all(content: str) -> List[DetectionResult]` 运行所有检测器
+- `detect_all(content: str) -> Dict[str, DetectionResult]` 运行所有检测器
 
 **验证**：
 - 编写 pytest 测试
@@ -235,7 +323,7 @@ class BaseDetector:
 - 如果指定类型，调用对应检测器
 - 如果未指定类型，调用 `detect_all` 运行所有检测器
 - 返回检测结果
-- 调用历史记录服务保存记录
+- 调用历史记录服务保存记录（加密存储）
 
 **验证**：
 - 使用 pytest 或 curl 发送 POST 请求
@@ -248,18 +336,21 @@ class BaseDetector:
 ### 步骤 4.2：实现历史记录服务
 **指令**：在 `backend/app/services/history.py` 中实现历史记录的增删改查功能。
 
+**信息安全知识点**：
+- 数据生命周期管理
+- 加密存储实现
+
 **功能**：
 - `save_history(content, detection_type, result)` - 保存检测记录（敏感字段加密）
 - `get_history(page, page_size)` - 分页获取历史列表
-- `get_history_by_id(id)` - 获取单条记录详情
+- `get_history_by_id(id)` - 获取单条记录详情（解密后返回）
 - `delete_history(id)` - 删除单条记录
 - `clear_history()` - 清空所有记录
-
-**注意**：保存时对 input_content 和 result_detail 进行加密，读取时解密。
 
 **验证**：
 - 编写 pytest 测试
 - 执行保存后从数据库验证数据已加密存储
+- 测试读取时正确解密
 - 测试分页功能
 - 测试删除功能
 
@@ -345,7 +436,7 @@ class BaseDetector:
 - 全部检测：分三栏展示三种检测结果
 
 **样式要求**：
-- 风险等级颜色：红色(高)、橙色(中)、绿色(低)
+- 风险等级颜色：红色(高)、橙色(中)、绿色(低)、蓝色(安全)
 - 清晰展示判定依据和建议列表
 
 **验证**：
@@ -465,6 +556,7 @@ class BaseDetector:
 **配置要求**：
 - 基础镜像：`python:3.11-slim`
 - 安装依赖
+- 预下载jieba词典
 - 配置启动命令
 - 设置环境变量
 
@@ -494,7 +586,7 @@ class BaseDetector:
 **指令**：在项目根目录创建 `docker-compose.yml`。
 
 **服务配置**：
-- api 服务：端口 8000，挂载数据卷
+- api 服务：端口 8000，挂载数据卷，健康检查
 - web 服务：端口 3000，依赖 api
 - 配置网络
 - 设置环境变量
@@ -555,11 +647,11 @@ class BaseDetector:
 | "紧急通知！系统检测到您的账户存在安全风险，请立即修改密码" | 中 |
 
 ### 弱密码检测测试用例
-| 输入 | 预期评分 |
-|------|---------|
-| "password" | 0-1 (弱) |
-| "Password1" | 2-3 (中) |
-| "Tr0ub4dor&3App!" | 4 (强) |
+| 输入 | 预期评分 | 风险等级 |
+|------|---------|---------|
+| "password" | 0 | 高 |
+| "Password1" | 2 | 中 |
+| "Tr0ub4dor&3App!" | 4 | 低 |
 
 ### 敏感信息检测测试用例
 | 输入 | 预期检测类型 |
@@ -584,3 +676,20 @@ class BaseDetector:
 
 ### 伪装性词汇
 官方、客服、银行、支付宝、微信支付、淘宝、京东、税务局、公安局
+
+---
+
+## 附录：信息安全知识点索引
+
+| 阶段 | 步骤 | 知识点 |
+|-----|------|--------|
+| 二 | 2.1 | 对称加密、密钥管理 |
+| 二 | 2.2 | CORS安全配置 |
+| 二 | 2.4 | 数据分类与分级 |
+| 二 | 2.5 | 输入验证 |
+| 三 | 3.1 | PII识别、DLP、正则表达式 |
+| 三 | 3.2 | 密码学熵值、密码攻击方式 |
+| 三 | 3.3 | 社会工程学、钓鱼心理学 |
+| 三 | 3.4 | ML在安全领域应用 |
+| 三 | 3.5 | NLP安全应用、置信度 |
+| 四 | 4.2 | 数据生命周期管理、加密存储 |
