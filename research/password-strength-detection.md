@@ -2,15 +2,61 @@
 
 ## 1. 概述
 
-本文档总结密码强度检测的核心原理和方法，参考zxcvbn的设计思路，为本项目的简化版弱密码检测器提供实现参考。
+本文档总结密码强度检测的核心原理和方法，参考zxcvbn的设计思路和最新学术研究，为本项目的简化版弱密码检测器提供实现参考。
 
 ---
 
-## 2. zxcvbn 核心原理
+## 2. 学术论文资源（arXiv）
 
-### 2.1 评分体系
+### 2.1 密码强度评估研究
 
-zxcvbn使用0-4的评分系统：
+| 论文标题 | 年份 | 链接 | 核心贡献 |
+|---------|------|------|---------|
+| Adversarial Machine Learning for Robust Password Strength Estimation | 2025 | [arXiv:2506.00373](https://arxiv.org/abs/2506.00373) | 对抗训练提升20%准确率，67万对抗样本 |
+| Interpretable Probabilistic Password Strength Meters via Deep Learning | 2020 | [arXiv:2004.07179](https://arxiv.org/abs/2004.07179) | 可解释概率模型，字符级安全贡献分析 |
+| Expectation Entropy as a Password Strength Metric | 2024 | [arXiv:2404.16853](https://arxiv.org/abs/2404.16853) | 期望熵新指标，0-1范围标准化 |
+| A Canonical Password Strength Measure | 2015 | [arXiv:1505.05090](https://arxiv.org/abs/1505.05090) | 密码强度规范化定义，考虑攻击者策略 |
+| Passwords: Divided they Stand, United they Fall | 2020 | [arXiv:2009.03062](https://arxiv.org/abs/2009.03062) | 空间分区攻击模型，密码密度分析 |
+| Password Strength Signaling: A Counter-Intuitive Defense | 2020 | [arXiv:2009.10060](https://arxiv.org/abs/2009.10060) | 密码强度信号防御，减少12%破解率 |
+
+### 2.2 关键技术发现
+
+**对抗训练方法 (2025)：**
+- 使用故意设计的欺骗性密码训练
+- 对抗训练提升分类准确率20%
+- 5种分类算法对比验证
+- 67万+对抗样本数据集
+
+**可解释密码强度计 (2020)：**
+- 每个字符的安全贡献可视化
+- 无人工偏见的反馈
+- 概率解释的强度建议
+- 轻量级深度学习框架，支持客户端运行
+
+**期望熵指标 (2024)：**
+- 结果在0-1范围，便于理解
+- 例如0.4表示攻击者需搜索40%空间
+- 适用于随机或类随机密码
+
+---
+
+## 3. GitHub开源项目
+
+### 3.1 zxcvbn系列（核心参考）
+
+| 项目名称 | Stars | 链接 | 技术栈 | 说明 |
+|---------|-------|------|--------|------|
+| **zxcvbn** (Dropbox官方) | 15,968 | [GitHub](https://github.com/dropbox/zxcvbn) | CoffeeScript/JS | 原版实现，低预算密码强度估算 |
+| **zxcvbn-ts** | 1,175 | [GitHub](https://github.com/zxcvbn-ts/zxcvbn) | TypeScript | TypeScript版本，前端友好 |
+| **zxcvbn-python** | 714 | [GitHub](https://github.com/dwolfhub/zxcvbn-python) | Python | Python实现，本项目推荐 |
+| **zxcvbn-php** | 870 | [GitHub](https://github.com/bjeavons/zxcvbn-php) | PHP | PHP移植版 |
+| **zxcvbn-go** | 393 | [GitHub](https://github.com/nbutton23/zxcvbn-go) | Go | Go语言实现 |
+| **zxcvbn4j** | 362 | [GitHub](https://github.com/nulab/zxcvbn4j) | Java | Java移植版 |
+| **zxcvbn-rs** | 261 | [GitHub](https://github.com/shssoichiro/zxcvbn-rs) | Rust | Rust实现 |
+
+### 3.2 zxcvbn核心原理
+
+**评分体系**：
 
 | 评分 | 强度 | 熵值(bits) | 破解时间 | 说明 |
 |-----|------|-----------|---------|------|
@@ -20,9 +66,7 @@ zxcvbn使用0-4的评分系统：
 | 3 | 强 | 60-127 | < 1年 | 可接受 |
 | 4 | 很强 | ≥ 128 | > 1年 | 推荐 |
 
-### 2.2 检测维度
-
-zxcvbn从以下维度分析密码：
+**检测维度**：
 
 | 维度 | 检测内容 | 示例 |
 |-----|---------|------|
@@ -33,24 +77,11 @@ zxcvbn从以下维度分析密码：
 | 序列模式 | 递增递减序列 | abc, 123, cba |
 | 组合模式 | 多模式组合 | password123 |
 
-### 2.3 熵值计算
-
-**公式**：
-```
-熵值 = log2(可能组合数)
-
-简化计算：
-- 仅小写字母: len × log2(26) ≈ len × 4.7
-- 大小写混合: len × log2(52) ≈ len × 5.7
-- 加数字: len × log2(62) ≈ len × 5.95
-- 加符号: len × log2(95) ≈ len × 6.6
-```
-
 ---
 
-## 3. 简化版检测器设计
+## 4. 简化版检测器设计
 
-### 3.1 检测规则
+### 4.1 检测规则
 
 #### 规则1：长度检查
 
@@ -73,14 +104,15 @@ zxcvbn从以下维度分析密码：
 
 #### 规则3：常见弱密码黑名单
 
-```
+```python
+# 来源: SecLists 常见密码列表
 top_100_passwords = [
     "password", "123456", "12345678", "qwerty", "abc123",
     "monkey", "1234567", "letmein", "trustno1", "dragon",
     "baseball", "iloveyou", "master", "sunshine", "ashley",
     "bailey", "passw0rd", "shadow", "123123", "654321",
     "superman", "qazwsx", "michael", "football", "password1",
-    # ... 可扩展
+    # ... 参考 SecLists 扩展
 ]
 ```
 
@@ -94,15 +126,7 @@ top_100_passwords = [
 | 重复字符 | `(.)\1{2,}` | -1 |
 | 连续序列 | `abc|bcd|cde|123|234|345` | -1 |
 
-#### 规则5：个人信息关联（可选）
-
-| 检测项 | 说明 |
-|-------|------|
-| 用户名 | 密码包含用户名 |
-| 日期 | 密码包含生日格式 |
-| 常见词 | 密码是英文常见词汇 |
-
-### 3.2 评分计算
+### 4.2 评分计算
 
 ```python
 def calculate_score(password: str) -> int:
@@ -140,9 +164,11 @@ def calculate_score(password: str) -> int:
     return max(0, min(4, score))
 ```
 
-### 3.3 熵值简化计算
+### 4.3 熵值计算
 
 ```python
+import math
+
 def calculate_entropy(password: str) -> float:
     """简化熵值计算"""
     charset_size = 0
@@ -159,13 +185,12 @@ def calculate_entropy(password: str) -> float:
     if charset_size == 0:
         return 0
     
-    import math
     return len(password) * math.log2(charset_size)
 ```
 
 ---
 
-## 4. 风险等级映射
+## 5. 风险等级映射
 
 | 评分 | 熵值(bits) | 风险等级 | 用户反馈 |
 |-----|-----------|---------|---------|
@@ -177,9 +202,7 @@ def calculate_entropy(password: str) -> float:
 
 ---
 
-## 5. 建议生成
-
-根据检测结果生成个性化建议：
+## 6. 建议生成
 
 ```python
 def generate_suggestions(password: str, score: int) -> list:
@@ -206,18 +229,28 @@ def generate_suggestions(password: str, score: int) -> list:
 
 ---
 
-## 6. 实现注意事项
+## 7. 实现注意事项
 
-1. **不要存储用户输入的密码**：仅计算强度并返回结果
-2. **结果不保存原文**：历史记录中仅保存风险等级和评分
+1. **加密保存输入内容**：根据用户确认，密码检测结果需加密保存输入内容
+2. **结果不保存原文**：历史记录中保存加密后的输入内容和评分结果
 3. **内存中处理**：处理完成后立即清除密码变量
 4. **前端传输**：使用HTTPS确保传输安全
 
 ---
 
-## 7. 参考资源
+## 8. 参考资源汇总
 
-- zxcvbn源码: https://github.com/dropbox/zxcvbn
+### 学术论文
+- [Adversarial ML for Password Strength](https://arxiv.org/abs/2506.00373) - 对抗训练方法
+- [Interpretable Password Meters](https://arxiv.org/abs/2004.07179) - 可解释深度学习
+- [Expectation Entropy](https://arxiv.org/abs/2404.16853) - 新型熵值指标
+- [Canonical Password Strength](https://arxiv.org/abs/1505.05090) - 强度规范化定义
+
+### 开源项目
+- [zxcvbn (Dropbox)](https://github.com/dropbox/zxcvbn) - 原版实现，15968 stars
+- [zxcvbn-python](https://github.com/dwolfhub/zxcvbn-python) - Python版本推荐
+- [SecLists](https://github.com/danielmiessler/SecLists) - 常见密码列表
+
+### 标准规范
 - NIST SP 800-63B: 数字身份指南（密码部分）
 - OWASP Password Strength Cheat Sheet
-- 常见密码列表: https://github.com/danielmiessler/SecLists
