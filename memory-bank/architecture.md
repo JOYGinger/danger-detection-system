@@ -123,6 +123,76 @@
         └── phishing_keywords.json
 ```
 
+### 3.1 文件作用说明
+
+**后端核心文件**：
+
+| 文件 | 作用 |
+|-----|------|
+| `backend/requirements.txt` | Python依赖清单，锁定版本确保环境一致性 |
+| `backend/.env.example` | 环境变量模板，包含ENCRYPTION_KEY和DATABASE_URL |
+| `backend/app/__init__.py` | Python包初始化 |
+| `backend/app/main.py` | FastAPI应用入口，配置CORS、注册路由、启动事件 |
+| `backend/app/config.py` | 从环境变量加载配置，验证必需变量存在 |
+| `backend/app/database.py` | SQLAlchemy引擎和Session配置，创建表结构 |
+| `backend/app/utils/__init__.py` | 工具包初始化 |
+| `backend/app/utils/crypto.py` | DataEncryptor类，Fernet加密/解密敏感字段 |
+| `backend/app/models/__init__.py` | 模型包初始化 |
+| `backend/app/models/detection.py` | DetectionHistory ORM模型，映射数据库表 |
+| `backend/app/schemas/__init__.py` | 模式包初始化 |
+| `backend/app/schemas/detection.py` | Pydantic请求/响应模型，输入验证 |
+| `backend/app/routers/__init__.py` | 路由包初始化 |
+| `backend/app/routers/detection.py` | API端点：检测、历史记录CRUD |
+| `backend/app/services/__init__.py` | 服务包初始化 |
+| `backend/app/services/detector.py` | 检测服务编排：接收请求→调用检测器→保存历史 |
+| `backend/app/services/history.py` | 历史记录服务：增删查改+加密存储 |
+| `backend/app/detectors/__init__.py` | 检测器工厂函数（get_detector, detect_all） |
+| `backend/app/detectors/base.py` | 检测器基类（BaseDetector）和DetectionResult数据类 |
+| `backend/app/detectors/phishing.py` | 钓鱼邮件检测器（TF-IDF + RandomForest） |
+| `backend/app/detectors/weak_password.py` | 弱密码检测器（zxcvbn-python） |
+| `backend/app/detectors/sensitive_info.py` | 敏感信息检测器（正则+规则引擎） |
+| `backend/tests/__init__.py` | 测试包初始化 |
+| `backend/tests/test_crypto.py` | 加密工具单元测试 |
+| `backend/tests/test_detectors.py` | 检测器单元测试 |
+| `backend/tests/test_api.py` | API集成测试 |
+
+**前端核心文件**：
+
+| 文件 | 作用 |
+|-----|------|
+| `frontend/package.json` | Node.js依赖和项目配置（React 18, Vite 5, Tailwind 3等） |
+| `frontend/vite.config.ts` | Vite构建配置，配置React插件、代理等 |
+| `frontend/tsconfig.json` | TypeScript根配置 |
+| `frontend/tsconfig.app.json` | 应用代码TypeScript配置 |
+| `frontend/tailwind.config.js` | Tailwind CSS配置，定义扫描路径 |
+| `frontend/postcss.config.js` | PostCSS配置，处理Tailwind和 Autoprefixer |
+| `frontend/eslint.config.js` | ESLint代码规范配置 |
+| `frontend/index.html` | HTML入口文件，root挂载点 |
+| `frontend/public/` | 静态资源目录（favicon等） |
+| `frontend/src/main.tsx` | React应用入口，createRoot渲染 |
+| `frontend/src/App.tsx` | 根组件，配置路由和布局 |
+| `frontend/src/index.css` | 全局样式，Tailwind指令 |
+| `frontend/src/api/client.ts` | Axios实例，配置baseURL为后端8000端口 |
+| `frontend/src/api/detection.ts` | 检测相关API调用（detectText） |
+| `frontend/src/api/history.ts` | 历史记录相关API调用（getHistory, deleteHistory, clearHistory） |
+| `frontend/src/store/useStore.ts` | Zustand全局状态管理 |
+| `frontend/src/pages/DetectPage.tsx` | 检测页面：输入、选择类型、展示结果 |
+| `frontend/src/pages/HistoryPage.tsx` | 历史记录页面：列表、删除、分页 |
+| `frontend/src/components/` | 可复用的UI组件 |
+
+**数据和配置**：
+
+| 文件 | 作用 |
+|-----|------|
+| `docker-compose.yml` | 多容器编排：api + web服务 |
+| `data/detections.db` | SQLite数据库文件（运行时生成） |
+| `data/models/phishing_model.joblib` | 训练好的RandomForest模型 |
+| `data/models/tfidf_vectorizer.joblib` | 训练好的TF-IDF向量化器 |
+| `data/training/phishing_emails.csv` | 钓鱼邮件训练样本 |
+| `data/training/normal_emails.csv` | 正常邮件训练样本 |
+| `data/training/phishing_keywords.json` | 中文钓鱼关键词分类词典 |
+| `backend/scripts/train_phishing_model.py` | 模型训练脚本 |
+
 ---
 
 ## 4. 核心模块说明

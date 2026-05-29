@@ -24,9 +24,10 @@
 ## 详细进度
 
 ### 阶段一：项目初始化
-- [ ] 步骤 1.1：创建项目目录结构
-- [ ] 步骤 1.2：初始化后端Python环境
-- [ ] 步骤 1.3：初始化前端项目
+- [x] 步骤 1.1：创建项目目录结构
+- [x] 步骤 1.2：初始化后端Python环境
+- [x] 步骤 1.3：初始化前端项目
+- [ ] 步骤 2.1：创建加密工具模块
 
 ### 阶段二：后端基础架构
 - [ ] 步骤 2.1：创建加密工具模块
@@ -103,6 +104,23 @@
 ## 更新日志
 
 ### 2026-05-28
+- **步骤 1.3 完成**：初始化前端项目（Vite + React + TypeScript）
+  - 使用 `npm create vite` 创建 React+TypeScript 项目
+  - 更新 `package.json`，添加依赖：react-router-dom, zustand, axios, clsx, tailwind-merge
+  - 安装所有依赖（npm install）
+  - 配置 Tailwind CSS：tailwind.config.js, postcss.config.js
+  - 创建基础文件：main.tsx, App.tsx, index.css（带Tailwind指令）
+  - 创建子目录：src/api/, src/components/, src/pages/, src/store/
+- **步骤 1.2 完成**：初始化后端Python环境
+  - 创建 `backend/requirements.txt`，包含所有依赖及锁定版本
+  - 创建 `backend/.env.example`，包含 `ENCRYPTION_KEY` 和 `DATABASE_URL` 变量模板
+  - 依赖：fastapi, uvicorn, sqlalchemy, scikit-learn, jieba, zxcvbn-python, cryptography, pytest等
+- **步骤 1.1 完成**：创建项目目录结构
+  - 创建 backend/app/ 及其子目录（utils, models, schemas, routers, services, detectors）
+  - 创建 backend/tests/
+  - 创建 frontend/src/ 及其子目录（api, components, pages, store）
+  - 创建 data/models/ 和 data/training/
+  - 创建所有 `__init__.py` 文件
 - 更新技术选型文档（tech-stack.md）
   - 密码强度检测改用zxcvbn-python
   - 敏感信息检测采用正则+规则引擎方案
