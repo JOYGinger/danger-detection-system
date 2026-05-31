@@ -10,6 +10,24 @@
 - 最小权限原则
 - 安全默认配置
 
+### 开发环境配置（重要）
+
+本项目在WSL（Linux）和Windows双环境下开发。由于WSL创建的 `.venv` 无法在Windows主机使用，切换环境时必须重建虚拟环境：
+
+**Windows环境首次启动步骤**：
+1. `cd E:\code\security-project\claude-test\backend`
+2. `Remove-Item -Recurse -Force .venv`（删除WSL创建的.venv，PowerShell语法；CMD下用 `rmdir /s /q .venv`）
+3. `python -m venv .venv`
+4. `.venv\Scripts\activate`
+5. `pip install -r requirements.txt`
+6. `python -m uvicorn app.main:app --reload`
+
+**WSL环境同理**：删除Windows的 `.venv` 后重建。
+
+**关键文件说明**：
+- `.env`（需手动创建，从 `.env.example` 复制）：包含 `ENCRYPTION_KEY`，不可提交到版本控制
+- `data/` 目录：由 `init_db()` 自动创建，存放 `detections.db`
+
 ---
 
 ## 2. 技术架构
@@ -132,15 +150,15 @@
 | `backend/requirements.txt` | Python依赖清单，锁定版本确保环境一致性 |
 | `backend/.env.example` | 环境变量模板，包含ENCRYPTION_KEY和DATABASE_URL |
 | `backend/app/__init__.py` | Python包初始化 |
-| `backend/app/main.py` | FastAPI应用入口，配置CORS、注册路由、启动事件 |
-| `backend/app/config.py` | 从环境变量加载配置，验证必需变量存在 |
-| `backend/app/database.py` | SQLAlchemy引擎和Session配置，创建表结构 |
+| `backend/app/main.py` | FastAPI应用入口：创建app实例（中文标题"危险检测集成系统"）；CORS中间件仅允许settings.CORS_ORIGINS中的源（默认localhost:3000）；`/health`端点返回`{"status":"ok"}`；自动生成`/docs`Swagger文档和`/openapi.json`；lifespan启动事件调用init_db()自动创建表；后续步骤在此注册路由 |
+| `backend/app/config.py` | Settings配置类：从.env/环境变量读取ENCRYPTION_KEY、DATABASE_URL（默认sqlite:///./data/detections.db）、APP_ENV、DEBUG、CORS_ORIGINS（逗号分隔）；使用python-dotenv加载.env文件 |
+| `backend/app/database.py` | SQLAlchemy配置：engine（SQLite，check_same_thread=False）、SessionLocal会话工厂、Base声明基类（所有ORM模型继承）、`init_db()`自动创建data目录和表结构、`get_db()`FastAPI依赖注入生成器 |
 | `backend/app/utils/__init__.py` | 工具包初始化 |
 | `backend/app/utils/crypto.py` | DataEncryptor类：Fernet(AES-128-CBC+HMAC-SHA256)认证加密；`encrypt(plaintext)->str`返回base64密文，空串直接返回空；`decrypt(ciphertext)->str`解密，空串直接返回空；`generate_key()->str`生成新Fernet密钥；ENCRYPTION_KEY未设置时抛出ValueError；加密在服务层手动调用，不在ORM层自动触发 |
-| `backend/app/models/__init__.py` | 模型包初始化 |
-| `backend/app/models/detection.py` | DetectionHistory ORM模型，映射数据库表 |
-| `backend/app/schemas/__init__.py` | 模式包初始化 |
-| `backend/app/schemas/detection.py` | Pydantic请求/响应模型，输入验证 |
+| `backend/app/models/__init__.py` | 导出DetectionHistory模型，确保init_db()能发现模型建表 |
+| `backend/app/models/detection.py` | DetectionHistory ORM模型：id(主键自增)、input_content_encrypted(Text非空，Fernet加密存储)、detection_type(String50，phishing/weak_password/sensitive_info/all)、risk_level(String20，high/medium/low/safe)、result_detail_encrypted(Text可空，Fernet加密JSON)、created_at(DateTime默认UTC)；索引idx_created_at和idx_detection_type；加密在服务层手动调用 |
+| `backend/app/schemas/__init__.py` | 导出所有Pydantic模型 |
+| `backend/app/schemas/detection.py` | Pydantic模型：DetectionType枚举(phishing/weak_password/sensitive_info)、RiskLevel枚举(high/medium/low/safe)、DetectRequest(content必填min_length=1，detection_type可选)、DetectResponse(success+result单类型/results全类型)、HistoryItem(不含敏感input_content，from_attributes=True)、HistoryList(items+分页)、HistoryDetail(含解密后input_content和result_detail) |
 | `backend/app/routers/__init__.py` | 路由包初始化 |
 | `backend/app/routers/detection.py` | API端点：检测、历史记录CRUD |
 | `backend/app/services/__init__.py` | 服务包初始化 |
@@ -155,7 +173,7 @@
 | `backend/tests/test_crypto.py` | 加密工具单元测试（11个用例）：加解密往返、空字符串、中文、长文本、特殊字符、不同加密产生不同密文、密钥缺失ValueError、无效密文InvalidToken、密钥生成格式和唯一性 |
 | `backend/pyproject.toml` | pytest配置文件，设置asyncio_mode=auto |
 | `backend/tests/test_detectors.py` | 检测器单元测试 |
-| `backend/tests/test_api.py` | API集成测试 |
+| `backend/tests/test_api.py` | API集成测试（3个用例）：health_check返回200和`{"status":"ok"}`、/docs返回200（Swagger页面）、/openapi.json返回200且包含标题和路径 |
 
 **前端核心文件**：
 

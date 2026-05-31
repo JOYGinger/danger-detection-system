@@ -1,7 +1,7 @@
 # 项目进度追踪
 
 ## 当前状态
-项目处于 **规划阶段完成**，已完成全部文档设计和研究资料整理，准备进入开发阶段。
+项目处于 **阶段二完成**，后端基础架构已搭建（加密模块、FastAPI入口、数据库、ORM模型、Pydantic模型），准备进入阶段三检测器实现。
 
 ---
 
@@ -14,7 +14,7 @@
 | 设计文档 | ✅ 已完成 | - | 2026-05-28 |
 | 实施计划 | ✅ 已完成 | - | 2026-05-28 |
 | 研究资料 | ✅ 已完成 | - | 2026-05-28 |
-| 后端开发 | ⏳ 待开始 | - | - |
+| 后端开发 | 🔄 进行中 | 2026-05-29 | - |
 | 前端开发 | ⏳ 待开始 | - | - |
 | 集成测试 | ⏳ 待开始 | - | - |
 | Docker部署 | ⏳ 待开始 | - | - |
@@ -30,10 +30,10 @@
 
 ### 阶段二：后端基础架构
 - [x] 步骤 2.1：创建加密工具模块
-- [ ] 步骤 2.2：创建FastAPI应用入口
-- [ ] 步骤 2.3：配置数据库连接
-- [ ] 步骤 2.4：定义数据库模型
-- [ ] 步骤 2.5：定义Pydantic模型
+- [x] 步骤 2.2：创建FastAPI应用入口
+- [x] 步骤 2.3：配置数据库连接
+- [x] 步骤 2.4：定义数据库模型
+- [x] 步骤 2.5：定义Pydantic模型
 
 ### 阶段三：检测器实现
 - [ ] 步骤 3.1：实现敏感信息检测器（正则+规则引擎）
@@ -101,6 +101,45 @@
 ---
 
 ## 更新日志
+
+### 2026-05-31
+- **步骤 2.5 完成**：定义Pydantic模型
+  - 创建 `backend/app/schemas/detection.py`：
+    - `DetectionType`枚举：phishing/weak_password/sensitive_info
+    - `RiskLevel`枚举：high/medium/low/safe
+    - `DetectRequest`：content(min_length=1必填)、detection_type(可选枚举)
+    - `DetectResponse`：success(bool)、result(单类型dict)、results(全部类型dict)
+    - `HistoryItem`：id/detection_type/risk_level/created_at，不含敏感input_content
+    - `HistoryList`：items列表+total/page/page_size分页
+    - `HistoryDetail`：含解密后的input_content和result_detail，用于单条记录详情
+  - 更新 `backend/app/schemas/__init__.py`：导出所有模型
+  - 创建 `backend/tests/test_schemas.py`：13个测试
+    - 枚举值验证、空content拒绝、无效detection_type拒绝、单类型/全类型响应、HistoryItem不含敏感字段、分页列表、详情模型
+  - 全部35个测试通过
+- **步骤 2.4 完成**：定义数据库模型
+  - 创建 `backend/app/models/detection.py`：DetectionHistory ORM模型
+    - 字段：id(主键自增)、input_content_encrypted(Text非空)、detection_type(String50非空)、risk_level(String20非空)、result_detail_encrypted(Text可空)、created_at(DateTime默认UTC)
+    - 索引：idx_created_at、idx_detection_type
+    - 使用 `datetime.now(timezone.utc)` 代替已弃用的 `datetime.utcnow()`
+  - 更新 `backend/app/models/__init__.py`：导出DetectionHistory
+  - 更新 `backend/app/main.py`：添加 `import app.models` 确保init_db()能发现模型建表
+  - 创建 `backend/tests/test_models.py`：5个测试（表创建、字段验证、列类型nullable、索引、插入查询）
+  - 全部22个测试通过，无警告
+  - **PowerShell命令提醒**：Windows PowerShell删除目录用 `Remove-Item -Recurse -Force .venv`，不是CMD的 `rmdir /s /q`
+- **步骤 2.3 完成**：配置数据库连接
+  - 创建 `backend/app/database.py`：SQLAlchemy引擎、SessionLocal、Base声明基类、init_db()自动建表、get_db()依赖注入
+  - init_db()中自动创建data目录（`db_dir.mkdir(parents=True, exist_ok=True)`）
+  - 更新 `backend/app/main.py`：使用lifespan上下文管理器，启动时调用init_db()
+  - 创建 `backend/tests/test_database.py`：3个测试（init_db建表、get_db会话yield、SessionLocal创建）
+  - 全部17个测试通过
+  - **环境配置记录**：WSL创建的.venv不能在Windows使用，需先 `rmdir /s /q .venv` 删除，再 `python -m venv .venv` + `pip install -r requirements.txt`
+- **步骤 2.2 完成**：创建FastAPI应用入口
+  - 创建 `backend/app/main.py`：FastAPI应用实例，配置CORS中间件（仅允许localhost:3000），健康检查端点/health
+  - 创建 `backend/app/config.py`：Settings配置类，从环境变量读取ENCRYPTION_KEY、DATABASE_URL、CORS_ORIGINS等
+  - 创建 `backend/tests/test_api.py`：3个异步测试全部通过（health_check、openapi_docs、openapi_json）
+  - 添加 `python-dotenv==1.0.1` 到 requirements.txt
+  - **环境提醒**：WSL创建的.venv不能在Windows使用，需在Windows上重新 `python -m venv .venv` 或 `uv venv` 后再 `pip install -r requirements.txt`
+  - **启动命令**：Windows下使用 `python -m uvicorn app.main:app --reload`（直接用uvicorn命令可能不在PATH中）
 
 ### 2026-05-29
 - **步骤 2.1 完成**：创建加密工具模块
