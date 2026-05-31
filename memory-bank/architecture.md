@@ -160,20 +160,21 @@
 | `backend/app/schemas/__init__.py` | 导出所有Pydantic模型 |
 | `backend/app/schemas/detection.py` | Pydantic模型：DetectionType枚举(phishing/weak_password/sensitive_info)、RiskLevel枚举(high/medium/low/safe)、DetectRequest(content必填min_length=1，detection_type可选)、DetectResponse(success+result单类型/results全类型)、HistoryItem(不含敏感input_content，from_attributes=True)、HistoryList(items+分页)、HistoryDetail(含解密后input_content和result_detail) |
 | `backend/app/routers/__init__.py` | 路由包初始化 |
-| `backend/app/routers/detection.py` | API端点：检测、历史记录CRUD |
+| `backend/app/routers/detection.py` | API端点：POST /api/detect/text（检测后自动调用save_history加密保存记录；单类型保存实际type，全类型保存type="all"并取最高risk_level）；GET /api/history（分页列表，不含input_content，最小化数据暴露）；GET /api/history/{id}（解密后返回详情，不存在404）；DELETE /api/history/{id}（单条删除，不存在404）；DELETE /api/history（清空返回deleted_count） |
 | `backend/app/services/__init__.py` | 服务包初始化 |
 | `backend/app/services/detector.py` | 检测服务编排：接收请求→调用检测器→保存历史 |
-| `backend/app/services/history.py` | 历史记录服务：增删查改+加密存储 |
-| `backend/app/detectors/__init__.py` | 检测器工厂函数（get_detector, detect_all） |
-| `backend/app/detectors/base.py` | 检测器基类（BaseDetector）和DetectionResult数据类 |
-| `backend/app/detectors/phishing.py` | 钓鱼邮件检测器（TF-IDF + RandomForest） |
-| `backend/app/detectors/weak_password.py` | 弱密码检测器（zxcvbn-python） |
-| `backend/app/detectors/sensitive_info.py` | 敏感信息检测器（正则+规则引擎） |
+| `backend/app/services/history.py` | 历史记录服务：save_history(加密存储input_content和result_detail)、get_history_list(分页，按created_at降序，不含敏感字段)、get_history_detail(解密后返回详情)、delete_history(单条删除)、clear_history(清空返回删除数)；DataEncryptor延迟初始化_get_encryptor()避免导入时环境变量未设置报错 |
+| `backend/app/detectors/__init__.py` | 检测器工厂：`get_detector(type)->BaseDetector`、`detect_all(content)->Dict[str,DetectionResult]`；当前仅注册sensitive_info，后续添加phishing/weak_password时在此注册 |
+| `backend/app/detectors/base.py` | DetectionResult数据类(type/risk_level/confidence/details/suggestions)、BaseDetector抽象基类(detect方法) |
+| `backend/app/detectors/phishing.py` | 钓鱼邮件检测器（TF-IDF + RandomForest）— 待实现 |
+| `backend/app/detectors/weak_password.py` | 弱密码检测器（zxcvbn-python）— 待实现 |
+| `backend/app/detectors/sensitive_info.py` | 敏感信息检测器：11条正则规则(API密钥5种/JWT/密码/邮箱/手机/身份证/私钥)；6种掩码方式(api_key保留前7后3/email保留首字母+域名/phone前3后4/id_card前6后4/password完全隐藏/token前6位/key_file标识)；风险计算(high>medium>low)；针对性安全建议生成 |
 | `backend/tests/__init__.py` | 测试包初始化 |
 | `backend/tests/test_crypto.py` | 加密工具单元测试（11个用例）：加解密往返、空字符串、中文、长文本、特殊字符、不同加密产生不同密文、密钥缺失ValueError、无效密文InvalidToken、密钥生成格式和唯一性 |
 | `backend/pyproject.toml` | pytest配置文件，设置asyncio_mode=auto |
 | `backend/tests/test_detectors.py` | 检测器单元测试 |
-| `backend/tests/test_api.py` | API集成测试（3个用例）：health_check返回200和`{"status":"ok"}`、/docs返回200（Swagger页面）、/openapi.json返回200且包含标题和路径 |
+| `backend/tests/test_api.py` | API集成测试（16个用例）：内存SQLite+dependency_overrides隔离，generate_key()生成测试密钥；基础3个(health/docs/openapi)；检测5个(sensitive_info/all_types/no_sensitive/empty/invalid)；历史8个(空列表/检测后查历史/详情查看验证解密/详情不存在404/删除/删除不存在404/清空验证count/分页) |
+| `backend/tests/test_history_service.py` | 历史记录服务单元测试（13个用例）：save基本保存/内容加密验证/结果加密验证、list空列表/分页/排序/不含敏感字段、detail存在记录解密/不存在返回None、delete存在/不存在、clear有记录/空表 |
 
 **前端核心文件**：
 

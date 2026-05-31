@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
+from app.routers import detection
 import app.models  # noqa: F401
 
 
@@ -28,6 +29,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(detection.router)
 
 
 @app.get("/health")

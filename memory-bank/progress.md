@@ -1,7 +1,7 @@
 # 项目进度追踪
 
 ## 当前状态
-项目处于 **阶段二完成**，后端基础架构已搭建（加密模块、FastAPI入口、数据库、ORM模型、Pydantic模型），准备进入阶段三检测器实现。
+项目处于 **阶段四完成**，MVP路径：后端全链路（检测→加密存储→历史记录CRUD）已打通，下一步开始前端实现。
 
 ---
 
@@ -14,7 +14,7 @@
 | 设计文档 | ✅ 已完成 | - | 2026-05-28 |
 | 实施计划 | ✅ 已完成 | - | 2026-05-28 |
 | 研究资料 | ✅ 已完成 | - | 2026-05-28 |
-| 后端开发 | 🔄 进行中 | 2026-05-29 | - |
+| 后端开发 | ✅ 已完成 | 2026-05-29 | 2026-05-31 |
 | 前端开发 | ⏳ 待开始 | - | - |
 | 集成测试 | ⏳ 待开始 | - | - |
 | Docker部署 | ⏳ 待开始 | - | - |
@@ -36,7 +36,7 @@
 - [x] 步骤 2.5：定义Pydantic模型
 
 ### 阶段三：检测器实现
-- [ ] 步骤 3.1：实现敏感信息检测器（正则+规则引擎）
+- [x] 步骤 3.1：实现敏感信息检测器（正则+规则引擎）
 - [ ] 步骤 3.2：实现弱密码检测器（zxcvbn-python）
 - [ ] 步骤 3.3：准备钓鱼邮件训练数据（CSV格式）
 - [ ] 步骤 3.4：训练钓鱼邮件检测模型
@@ -44,9 +44,9 @@
 - [ ] 步骤 3.6：创建检测器工厂
 
 ### 阶段四：API路由实现
-- [ ] 步骤 4.1：实现检测API
-- [ ] 步骤 4.2：实现历史记录服务
-- [ ] 步骤 4.3：实现历史记录API
+- [x] 步骤 4.1：实现检测API
+- [x] 步骤 4.2：实现历史记录服务
+- [x] 步骤 4.3：实现历史记录API
 
 ### 阶段五：前端实现
 - [ ] 步骤 5.1：创建API客户端
@@ -86,6 +86,7 @@
 | 钓鱼邮件检测方案 | TF-IDF + RF（MVP），DistilBERT（升级路径） | 2026-05-28 |
 | 敏感信息检测方案 | 正则 + 规则引擎 | 2026-05-28 |
 | 弱密码检测方案 | 直接使用zxcvbn-python库 | 2026-05-28 |
+| MVP先实现敏感信息检测 | 先打通一个完整链路验证系统可行性，跳过弱密码和钓鱼邮件 | 2026-05-31 |
 
 ---
 
@@ -103,6 +104,59 @@
 ## 更新日志
 
 ### 2026-05-31
+- **步骤 3.1 完成**：实现敏感信息检测器（MVP路径）
+  - 创建 `backend/app/detectors/base.py`：DetectionResult数据类(type/risk_level/confidence/details/suggestions)、BaseDetector抽象基类
+  - 创建 `backend/app/detectors/sensitive_info.py`：SensitiveInfoDetector
+    - 11条检测规则：OpenAI/AWS/GitHub/Google/Stripe API密钥、JWT Token、密码字段、邮箱、手机号、身份证、私钥
+    - 掩码函数：API密钥保留前7后3、邮箱保留首字母+域名、手机号前3后4、身份证前6后4、密码完全隐藏
+    - 风险计算：有high级发现→high，有medium→medium，否则low
+    - 建议生成：根据检测类型给出针对性安全建议
+  - 更新 `backend/app/detectors/__init__.py`：工厂函数get_detector()、detect_all()，当前仅注册sensitive_info
+  - 创建 `backend/tests/test_detectors.py`：21个测试（基类、工厂、11种类型检测、掩码、位置、建议）
+  - 修正OpenAI API密钥正则：`sk-[a-zA-Z0-9]` → `sk-[a-zA-Z0-9_-]`，支持 `sk-proj-` 等含连字符的密钥
+  - 全部56个测试通过
+- **步骤 4.1 完成**：实现检测API
+  - 创建 `backend/app/routers/detection.py`：`POST /api/detect/text`端点
+    - 当`detection_type`有值时，调用对应检测器，返回`result`（单类型）
+    - 当`detection_type`为空时，调用`detect_all()`，返回`results`（全部类型）
+    - 注入`db: Session`依赖（为后续保存历史记录预留）
+  - 更新 `backend/app/main.py`：注册detection路由 `app.include_router(detection.router)`
+  - 更新 `backend/tests/test_api.py`：新增5个API测试
+    - test_detect_sensitive_info：检测敏感信息，验证risk_level=high，count>=2
+    - test_detect_all_types：不指定类型，验证results包含sensitive_info
+    - test_detect_no_sensitive_info：普通文本，验证risk_level=safe
+    - test_detect_empty_content：空内容，验证422
+    - test_detect_invalid_type：无效检测类型，验证422
+  - 全部61个测试通过
+- **步骤 4.2 完成**：实现历史记录服务
+  - 创建 `backend/app/services/history.py`：历史记录增删查改服务
+    - `save_history(db, content, detection_type, risk_level, result_detail)` - 保存检测记录，input_content和result_detail通过Fernet加密后存储
+    - `get_history_list(db, page, page_size)` - 分页获取历史列表（不含敏感字段，按created_at降序）
+    - `get_history_detail(db, record_id)` - 获取单条记录详情（解密后返回input_content和result_detail）
+    - `delete_history(db, record_id)` - 删除单条记录，不存在返回False
+    - `clear_history(db)` - 清空所有记录，返回删除数量
+    - DataEncryptor使用延迟初始化（`_get_encryptor()`），避免模块导入时ENCRYPTION_KEY环境变量未设置导致报错
+  - 创建 `backend/tests/test_history_service.py`：13个测试
+    - TestSaveHistory：基本保存、内容加密验证（密文≠明文）、结果加密验证
+    - TestGetHistoryList：空列表、分页（15条分2页）、按created_at降序、不含敏感字段
+    - TestGetHistoryDetail：获取存在记录（解密后中文内容正确）、不存在记录返回None
+    - TestDeleteHistory：删除存在记录、不存在记录返回False
+    - TestClearHistory：清空5条记录返回5、空表返回0
+  - 全部74个测试通过
+- **步骤 4.3 完成**：实现历史记录API
+  - 更新 `backend/app/routers/detection.py`：
+    - 检测API接入历史记录保存：单类型检测保存实际detection_type，全类型检测保存detection_type="all"、risk_level取所有结果中最高级别
+    - 新增4个历史记录API端点：
+      - `GET /api/history` - 分页获取历史列表（page/page_size参数），不含敏感字段（最小化数据暴露原则）
+      - `GET /api/history/{record_id}` - 获取单条记录详情（解密后返回input_content和result_detail），不存在返回404
+      - `DELETE /api/history/{record_id}` - 删除单条记录，不存在返回404
+      - `DELETE /api/history` - 清空所有历史，返回deleted_count
+  - 更新 `backend/tests/test_api.py`：
+    - 改用内存SQLite数据库 + `dependency_overrides[get_db]`隔离测试数据（每个测试自动建表/清表）
+    - 用`generate_key()`生成有效的Fernet测试密钥
+    - 新增8个历史记录API测试：空列表、检测后查历史、详情查看（验证解密后input_content正确）、不存在记录404、删除、删除不存在404、清空（验证deleted_count）、分页
+  - 全部82个测试通过
+  - **验证注意事项**：运行后端需确保`.env`文件存在且`ENCRYPTION_KEY`已填写有效Fernet密钥，否则检测API会500报错
 - **步骤 2.5 完成**：定义Pydantic模型
   - 创建 `backend/app/schemas/detection.py`：
     - `DetectionType`枚举：phishing/weak_password/sensitive_info
@@ -224,11 +278,4 @@
 
 ## 下一步计划
 
-1. **开始阶段一：项目初始化**
-   - 创建项目目录结构
-   - 初始化后端Python环境（requirements.txt, .env.example）
-   - 初始化前端项目（Vite + React + TypeScript）
-
-2. **准备工作**
-   - 用户提供钓鱼邮件训练数据
-   - 生成ENCRYPTION_KEY并配置环境变量
+1. **阶段五**：前端实现（API客户端、状态管理、检测页面、结果展示、历史记录页面、路由导航）
