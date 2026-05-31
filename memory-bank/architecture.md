@@ -136,7 +136,7 @@
 | `backend/app/config.py` | 从环境变量加载配置，验证必需变量存在 |
 | `backend/app/database.py` | SQLAlchemy引擎和Session配置，创建表结构 |
 | `backend/app/utils/__init__.py` | 工具包初始化 |
-| `backend/app/utils/crypto.py` | DataEncryptor类，Fernet加密/解密敏感字段 |
+| `backend/app/utils/crypto.py` | DataEncryptor类：Fernet(AES-128-CBC+HMAC-SHA256)认证加密；`encrypt(plaintext)->str`返回base64密文，空串直接返回空；`decrypt(ciphertext)->str`解密，空串直接返回空；`generate_key()->str`生成新Fernet密钥；ENCRYPTION_KEY未设置时抛出ValueError；加密在服务层手动调用，不在ORM层自动触发 |
 | `backend/app/models/__init__.py` | 模型包初始化 |
 | `backend/app/models/detection.py` | DetectionHistory ORM模型，映射数据库表 |
 | `backend/app/schemas/__init__.py` | 模式包初始化 |
@@ -152,7 +152,8 @@
 | `backend/app/detectors/weak_password.py` | 弱密码检测器（zxcvbn-python） |
 | `backend/app/detectors/sensitive_info.py` | 敏感信息检测器（正则+规则引擎） |
 | `backend/tests/__init__.py` | 测试包初始化 |
-| `backend/tests/test_crypto.py` | 加密工具单元测试 |
+| `backend/tests/test_crypto.py` | 加密工具单元测试（11个用例）：加解密往返、空字符串、中文、长文本、特殊字符、不同加密产生不同密文、密钥缺失ValueError、无效密文InvalidToken、密钥生成格式和唯一性 |
+| `backend/pyproject.toml` | pytest配置文件，设置asyncio_mode=auto |
 | `backend/tests/test_detectors.py` | 检测器单元测试 |
 | `backend/tests/test_api.py` | API集成测试 |
 

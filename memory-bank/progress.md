@@ -27,10 +27,9 @@
 - [x] 步骤 1.1：创建项目目录结构
 - [x] 步骤 1.2：初始化后端Python环境
 - [x] 步骤 1.3：初始化前端项目
-- [ ] 步骤 2.1：创建加密工具模块
 
 ### 阶段二：后端基础架构
-- [ ] 步骤 2.1：创建加密工具模块
+- [x] 步骤 2.1：创建加密工具模块
 - [ ] 步骤 2.2：创建FastAPI应用入口
 - [ ] 步骤 2.3：配置数据库连接
 - [ ] 步骤 2.4：定义数据库模型
@@ -102,6 +101,33 @@
 ---
 
 ## 更新日志
+
+### 2026-05-29
+- **步骤 2.1 完成**：创建加密工具模块
+  - 创建 `backend/app/utils/crypto.py`：DataEncryptor类（Fernet AES-128-CBC + HMAC-SHA256）
+  - 实现 `encrypt()`/`decrypt()` 方法，空字符串直接返回空
+  - 实现 `generate_key()` 辅助函数
+  - ENCRYPTION_KEY未设置时抛出ValueError
+  - 创建 `backend/tests/test_crypto.py`：11个单元测试全部通过
+  - 测试覆盖：加解密往返、空字符串、中文、长文本、特殊字符、不同加密产生不同密文、密钥缺失、无效密文、密钥生成
+  - 创建 `backend/pyproject.toml`：pytest配置（asyncio_mode=auto）
+  - 升级pytest-asyncio修复Python 3.12兼容问题
+  - **依赖版本升级**（适配Python 3.13）：
+    - scikit-learn: 1.4.0 → 1.5.2
+    - numpy: 1.26.3 → 2.1.0
+    - cryptography: 42.0.0 → 43.0.0
+    - regex: 2023.12.25 → 2024.9.11
+    - fastapi: 0.109.0 → 0.115.0
+    - uvicorn: 0.27.0 → 0.32.0
+    - pydantic: 2.5.3 → 2.10.0
+    - pydantic-settings: 2.1.0 → 2.6.0
+    - sqlalchemy: 2.0.25 → 2.0.36
+    - joblib: 1.3.2 → 1.4.2
+    - pytest: 8.0.0 → 8.3.0
+    - pytest-asyncio: 0.23.0 → 0.24.0
+    - httpx: 0.26.0 → 0.27.0
+    - python-multipart: 0.0.6 → 0.0.12
+  - **重要提醒**：WSL和Windows环境需分别运行 `pip install -r requirements.txt`
 
 ### 2026-05-28
 - **步骤 1.3 完成**：初始化前端项目（Vite + React + TypeScript）
