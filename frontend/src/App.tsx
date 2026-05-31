@@ -1,26 +1,48 @@
-import { useState } from 'react'
-import './index.css'
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
+import DetectPage from './pages/DetectPage'
+import HistoryPage from './pages/HistoryPage'
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold text-gray-800 mb-4">
-          危险检测集成系统
-        </h1>
-        <p className="text-gray-600">
-          前端项目初始化完成
-        </p>
-        <button
-          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          onClick={() => setCount(count + 1)}
-        >
-          计数: {count}
-        </button>
+    <BrowserRouter>
+      <div className="min-h-screen bg-gray-100">
+        <nav className="bg-white shadow-sm">
+          <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+            <h1 className="text-lg font-bold text-gray-800">危险检测集成系统</h1>
+            <div className="flex gap-1">
+              <NavLink
+                to="/"
+                end
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    isActive ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+                  }`
+                }
+              >
+                检测
+              </NavLink>
+              <NavLink
+                to="/history"
+                className={({ isActive }) =>
+                  `px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    isActive ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+                  }`
+                }
+              >
+                历史
+              </NavLink>
+            </div>
+          </div>
+        </nav>
+
+        <main className="px-4 py-6">
+          <Routes>
+            <Route path="/" element={<DetectPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+          </Routes>
+        </main>
       </div>
-    </div>
+    </BrowserRouter>
   )
 }
 

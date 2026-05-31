@@ -181,7 +181,7 @@
 | 文件 | 作用 |
 |-----|------|
 | `frontend/package.json` | Node.js依赖和项目配置（React 18, Vite 5, Tailwind 3等） |
-| `frontend/vite.config.ts` | Vite构建配置，配置React插件、代理等 |
+| `frontend/vite.config.ts` | Vite构建配置：React插件 + 开发代理（/api和/health转发到http://localhost:8000，解决CORS） |
 | `frontend/tsconfig.json` | TypeScript根配置 |
 | `frontend/tsconfig.app.json` | 应用代码TypeScript配置 |
 | `frontend/tailwind.config.js` | Tailwind CSS配置，定义扫描路径 |
@@ -190,14 +190,13 @@
 | `frontend/index.html` | HTML入口文件，root挂载点 |
 | `frontend/public/` | 静态资源目录（favicon等） |
 | `frontend/src/main.tsx` | React应用入口，createRoot渲染 |
-| `frontend/src/App.tsx` | 根组件，配置路由和布局 |
-| `frontend/src/index.css` | 全局样式，Tailwind指令 |
-| `frontend/src/api/client.ts` | Axios实例，配置baseURL为后端8000端口 |
-| `frontend/src/api/detection.ts` | 检测相关API调用（detectText） |
-| `frontend/src/api/history.ts` | 历史记录相关API调用（getHistory, deleteHistory, clearHistory） |
-| `frontend/src/store/useStore.ts` | Zustand全局状态管理 |
-| `frontend/src/pages/DetectPage.tsx` | 检测页面：输入、选择类型、展示结果 |
-| `frontend/src/pages/HistoryPage.tsx` | 历史记录页面：列表、删除、分页 |
+| `frontend/src/App.tsx` | 根组件：BrowserRouter路由，顶部导航栏（检测/历史NavLink激活态），Routes配置`/`→DetectPage、`/history`→HistoryPage |
+| `frontend/src/api/client.ts` | Axios实例，baseURL为空字符串（使用Vite代理转发，开发环境避免CORS），超时10秒 |
+| `frontend/src/api/detection.ts` | 检测API：detectText(DetectRequest)→DetectResponse，含TypeScript接口(DetectRequest/DetectionResult/DetectResponse) |
+| `frontend/src/api/history.ts` | 历史记录API：getHistory(page,pageSize)→HistoryList、getHistoryDetail(id)→HistoryDetail、deleteHistoryItem(id)、clearHistory()，含TypeScript接口(HistoryItem/HistoryList/HistoryDetail) |
+| `frontend/src/store/useStore.ts` | Zustand全局状态管理：useDetectionStore(currentResult/loading/error，detectText/clearResult)；useHistoryStore(historyList/historyDetail/分页状态/loading/error，fetchHistory/fetchHistoryDetail/deleteHistoryItem/clearAllHistory) |
+| `frontend/src/pages/DetectPage.tsx` | 检测页面：类型下拉框、文本输入、检测/清空按钮、loading；ResultCard组件展示结果（风险颜色红橙绿蓝、置信度、发现项、建议）；单类型单卡片、全类型多卡片 |
+| `frontend/src/pages/HistoryPage.tsx` | 历史记录页面：记录列表（风险标签+类型+时间+删除）、分页、清空所有（二次确认） |
 | `frontend/src/components/` | 可复用的UI组件 |
 
 **数据和配置**：

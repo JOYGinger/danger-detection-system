@@ -1,7 +1,7 @@
 # 项目进度追踪
 
 ## 当前状态
-项目处于 **阶段四完成**，MVP路径：后端全链路（检测→加密存储→历史记录CRUD）已打通，下一步开始前端实现。
+项目处于 **阶段五完成**，前端全部页面（检测+历史+路由导航）已实现，下一步集成测试。
 
 ---
 
@@ -15,7 +15,7 @@
 | 实施计划 | ✅ 已完成 | - | 2026-05-28 |
 | 研究资料 | ✅ 已完成 | - | 2026-05-28 |
 | 后端开发 | ✅ 已完成 | 2026-05-29 | 2026-05-31 |
-| 前端开发 | ⏳ 待开始 | - | - |
+| 前端开发 | ✅ 已完成 | 2026-05-31 | 2026-05-31 |
 | 集成测试 | ⏳ 待开始 | - | - |
 | Docker部署 | ⏳ 待开始 | - | - |
 
@@ -49,12 +49,12 @@
 - [x] 步骤 4.3：实现历史记录API
 
 ### 阶段五：前端实现
-- [ ] 步骤 5.1：创建API客户端
-- [ ] 步骤 5.2：创建全局状态管理
-- [ ] 步骤 5.3：实现检测页面
-- [ ] 步骤 5.4：实现结果展示组件
-- [ ] 步骤 5.5：实现历史记录页面
-- [ ] 步骤 5.6：配置路由和导航
+- [x] 步骤 5.1：创建API客户端
+- [x] 步骤 5.2：创建全局状态管理
+- [x] 步骤 5.3：实现检测页面
+- [x] 步骤 5.4：实现结果展示组件
+- [x] 步骤 5.5：实现历史记录页面
+- [x] 步骤 5.6：配置路由和导航
 
 ### 阶段六：集成测试
 - [ ] 步骤 6.1：后端集成测试
@@ -104,6 +104,39 @@
 ## 更新日志
 
 ### 2026-05-31
+- **步骤 5.1 完成**：创建API客户端
+  - 创建 `frontend/src/api/client.ts`：axios实例，baseURL为空字符串（使用Vite代理转发避免CORS），超时10秒
+  - 创建 `frontend/src/api/detection.ts`：检测API
+    - `detectText(DetectRequest)` → `DetectResponse`
+    - TypeScript接口：DetectRequest、DetectionResult、DetectResponse
+  - 创建 `frontend/src/api/history.ts`：历史记录API
+    - `getHistory(page, pageSize)` → HistoryList
+    - `getHistoryDetail(id)` → HistoryDetail
+    - `deleteHistoryItem(id)`、`clearHistory()` → deleted_count
+    - TypeScript接口：HistoryItem、HistoryList、HistoryDetail
+  - 更新 `frontend/vite.config.ts`：添加代理配置，`/api`和`/health`请求转发到`http://localhost:8000`
+  - **CORS解决方案**：使用Vite代理而非修改后端CORS配置，开发环境更安全；生产环境由nginx处理
+  - TypeScript编译无错误，浏览器控制台验证API调用成功
+- **步骤 5.2 完成**：创建全局状态管理
+  - 创建 `frontend/src/store/useStore.ts`：两个Zustand store
+    - `useDetectionStore`：currentResult/loading/error状态，detectText()调用API执行检测，clearResult()清空
+    - `useHistoryStore`：historyList/historyDetail/historyTotal/historyPage/historyPageSize/loading/error状态，fetchHistory()分页获取、fetchHistoryDetail()获取详情、deleteHistoryItem()删除后自动刷新列表、clearAllHistory()清空
+  - TypeScript编译无错误
+- **步骤 5.3-5.6 完成**：实现前端全部页面
+  - 创建 `frontend/src/pages/DetectPage.tsx`：检测页面
+    - 检测类型下拉框（全部/敏感信息/弱密码/钓鱼邮件）
+    - 多行文本输入框、开始检测/清空按钮、loading状态
+    - ResultCard结果展示组件：风险等级颜色（红high/橙medium/绿low/蓝safe）、置信度、详细发现项、安全建议
+    - 单类型显示单个ResultCard，全类型显示多个
+  - 创建 `frontend/src/pages/HistoryPage.tsx`：历史记录页面
+    - 记录列表（风险等级标签、检测类型、时间、删除按钮）
+    - 分页（上一页/下一页）
+    - 清空所有（需二次确认，点击按钮后变为"确认清空？"，失焦取消）
+  - 更新 `frontend/src/App.tsx`：路由和导航
+    - 顶部导航栏（检测/历史两个tab，NavLink激活态高亮）
+    - 路由：`/` → 检测页面，`/history` → 历史页面
+    - BrowserRouter包裹，Tailwind样式
+  - TypeScript编译无错误，浏览器验证检测和历史功能正常
 - **步骤 3.1 完成**：实现敏感信息检测器（MVP路径）
   - 创建 `backend/app/detectors/base.py`：DetectionResult数据类(type/risk_level/confidence/details/suggestions)、BaseDetector抽象基类
   - 创建 `backend/app/detectors/sensitive_info.py`：SensitiveInfoDetector
@@ -278,4 +311,10 @@
 
 ## 下一步计划
 
-1. **阶段五**：前端实现（API客户端、状态管理、检测页面、结果展示、历史记录页面、路由导航）
+1. **阶段六**：集成测试
+
+---
+
+## 未来优化
+
+- **敏感信息检测升级为NLP模型**：当前使用正则+规则引擎，无法做语义理解（如"我的密码是admin123"不一定匹配），存在误报可能；后续可升级为DistilBERT等NLP模型，实现语义级别的敏感信息识别，降低误报率、提升对非标准格式的检测能力
