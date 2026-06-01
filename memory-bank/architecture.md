@@ -164,16 +164,16 @@
 | `backend/app/services/__init__.py` | 服务包初始化 |
 | `backend/app/services/detector.py` | 检测服务编排：接收请求→调用检测器→保存历史 |
 | `backend/app/services/history.py` | 历史记录服务：save_history(加密存储input_content和result_detail)、get_history_list(分页，按created_at降序，不含敏感字段)、get_history_detail(解密后返回详情)、delete_history(单条删除)、clear_history(清空返回删除数)；DataEncryptor延迟初始化_get_encryptor()避免导入时环境变量未设置报错 |
-| `backend/app/detectors/__init__.py` | 检测器工厂：`get_detector(type)->BaseDetector`、`detect_all(content)->Dict[str,DetectionResult]`；当前仅注册sensitive_info，后续添加phishing/weak_password时在此注册 |
+| `backend/app/detectors/__init__.py` | 检测器工厂：`get_detector(type)->BaseDetector`、`detect_all(content)->Dict[str,DetectionResult]`；已注册 sensitive_info、weak_password，phishing 待实现 |
 | `backend/app/detectors/base.py` | DetectionResult数据类(type/risk_level/confidence/details/suggestions)、BaseDetector抽象基类(detect方法) |
 | `backend/app/detectors/phishing.py` | 钓鱼邮件检测器（TF-IDF + RandomForest）— 待实现 |
-| `backend/app/detectors/weak_password.py` | 弱密码检测器（zxcvbn-python）— 待实现 |
+| `backend/app/detectors/weak_password.py` | 弱密码检测器（zxcvbn-python）：score 0-4 映射风险等级；输出 entropy_bits/guesses/crack_time/feedback/patterns；中文密码学建议（NIST、字典/键盘攻击解读）；全部检测时对非密码格式（多行/长度异常）跳过 |
 | `backend/app/detectors/sensitive_info.py` | 敏感信息检测器：11条正则规则(API密钥5种/JWT/密码/邮箱/手机/身份证/私钥)；6种掩码方式(api_key保留前7后3/email保留首字母+域名/phone前3后4/id_card前6后4/password完全隐藏/token前6位/key_file标识)；风险计算(high>medium>low)；针对性安全建议生成 |
 | `backend/tests/__init__.py` | 测试包初始化 |
 | `backend/tests/test_crypto.py` | 加密工具单元测试（11个用例）：加解密往返、空字符串、中文、长文本、特殊字符、不同加密产生不同密文、密钥缺失ValueError、无效密文InvalidToken、密钥生成格式和唯一性 |
 | `backend/pyproject.toml` | pytest配置文件，设置asyncio_mode=auto |
-| `backend/tests/test_detectors.py` | 检测器单元测试 |
-| `backend/tests/test_api.py` | API集成测试（16个用例）：内存SQLite+dependency_overrides隔离，generate_key()生成测试密钥；基础3个(health/docs/openapi)；检测5个(sensitive_info/all_types/no_sensitive/empty/invalid)；历史8个(空列表/检测后查历史/详情查看验证解密/详情不存在404/删除/删除不存在404/清空验证count/分页) |
+| `backend/tests/test_detectors.py` | 检测器单元测试（28+用例）：工厂、敏感信息、弱密码 |
+| `backend/tests/test_api.py` | API集成测试：含 weak_password 检测用例 |
 | `backend/tests/test_history_service.py` | 历史记录服务单元测试（13个用例）：save基本保存/内容加密验证/结果加密验证、list空列表/分页/排序/不含敏感字段、detail存在记录解密/不存在返回None、delete存在/不存在、clear有记录/空表 |
 
 **前端核心文件**：
@@ -195,7 +195,7 @@
 | `frontend/src/api/detection.ts` | 检测API：detectText(DetectRequest)→DetectResponse，含TypeScript接口(DetectRequest/DetectionResult/DetectResponse) |
 | `frontend/src/api/history.ts` | 历史记录API：getHistory(page,pageSize)→HistoryList、getHistoryDetail(id)→HistoryDetail、deleteHistoryItem(id)、clearHistory()，含TypeScript接口(HistoryItem/HistoryList/HistoryDetail) |
 | `frontend/src/store/useStore.ts` | Zustand全局状态管理：useDetectionStore(currentResult/loading/error，detectText/clearResult)；useHistoryStore(historyList/historyDetail/分页状态/loading/error，fetchHistory/fetchHistoryDetail/deleteHistoryItem/clearAllHistory) |
-| `frontend/src/pages/DetectPage.tsx` | 检测页面：类型下拉框、文本输入、检测/清空按钮、loading；ResultCard组件展示结果（风险颜色红橙绿蓝、置信度、发现项、建议）；单类型单卡片、全类型多卡片 |
+| `frontend/src/pages/DetectPage.tsx` | 检测页面：类型下拉框、文本输入、检测/清空按钮、loading；ResultCard按类型展示（敏感信息findings/弱密码评分熵破解时间patterns/建议）；弱密码模式专用 placeholder |
 | `frontend/src/pages/HistoryPage.tsx` | 历史记录页面：记录列表（风险标签+类型+时间+删除）、分页、清空所有（二次确认） |
 | `frontend/src/components/` | 可复用的UI组件 |
 

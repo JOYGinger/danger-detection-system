@@ -2,9 +2,11 @@ from typing import Dict
 
 from app.detectors.base import BaseDetector, DetectionResult
 from app.detectors.sensitive_info import SensitiveInfoDetector
+from app.detectors.weak_password import WeakPasswordDetector
 
 _DETECTORS: Dict[str, type] = {
     "sensitive_info": SensitiveInfoDetector,
+    "weak_password": WeakPasswordDetector,
 }
 
 

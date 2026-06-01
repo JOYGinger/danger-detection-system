@@ -67,3 +67,5 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+.codex/
+AGENTS.md

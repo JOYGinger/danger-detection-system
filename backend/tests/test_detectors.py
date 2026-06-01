@@ -2,6 +2,7 @@ import pytest
 from app.detectors import get_detector, detect_all
 from app.detectors.base import BaseDetector, DetectionResult
 from app.detectors.sensitive_info import SensitiveInfoDetector
+from app.detectors.weak_password import WeakPasswordDetector
 
 
 class TestBaseDetector:
@@ -16,6 +17,10 @@ class TestDetectorFactory:
         detector = get_detector("sensitive_info")
         assert isinstance(detector, SensitiveInfoDetector)
 
+    def test_get_weak_password_detector(self):
+        detector = get_detector("weak_password")
+        assert isinstance(detector, WeakPasswordDetector)
+
     def test_get_unknown_detector(self):
         with pytest.raises(ValueError, match="未知"):
             get_detector("unknown")
@@ -23,7 +28,9 @@ class TestDetectorFactory:
     def test_detect_all(self):
         results = detect_all("sk-1234567890abcdef1234567890")
         assert "sensitive_info" in results
+        assert "weak_password" in results
         assert isinstance(results["sensitive_info"], DetectionResult)
+        assert isinstance(results["weak_password"], DetectionResult)
 
 
 class TestSensitiveInfoDetector:
@@ -110,4 +117,44 @@ class TestSensitiveInfoDetector:
 
     def test_suggestions_not_empty(self):
         result = self.detector.detect("sk-proj-abc123def456ghi789jkl")
+        assert len(result.suggestions) > 0
+
+
+class TestWeakPasswordDetector:
+    def setup_method(self):
+        self.detector = WeakPasswordDetector()
+
+    def test_weak_password_high_risk(self):
+        result = self.detector.detect("password123")
+        assert result.type == "weak_password"
+        assert result.risk_level == "high"
+        assert result.details["score"] <= 1
+
+    def test_strong_password_low_risk(self):
+        result = self.detector.detect("Tr0ub4dor&3App!")
+        assert result.type == "weak_password"
+        assert result.risk_level == "low"
+        assert result.details["score"] >= 3
+
+    def test_empty_after_strip(self):
+        result = self.detector.detect("   ")
+        assert result.risk_level == "safe"
+        assert result.details.get("skipped") is True
+
+    def test_multiline_skipped(self):
+        result = self.detector.detect("line1\nline2")
+        assert result.risk_level == "safe"
+        assert result.details.get("skipped") is True
+
+    def test_details_fields(self):
+        result = self.detector.detect("password123")
+        assert "score" in result.details
+        assert result.details["score_max"] == 4
+        assert "entropy_bits" in result.details
+        assert "crack_time" in result.details
+        assert "feedback" in result.details
+        assert "patterns" in result.details
+
+    def test_suggestions_not_empty(self):
+        result = self.detector.detect("password123")
         assert len(result.suggestions) > 0

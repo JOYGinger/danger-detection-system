@@ -97,6 +97,43 @@ async def test_detect_all_types():
     assert data["success"] is True
     assert data["results"] is not None
     assert "sensitive_info" in data["results"]
+    assert "weak_password" in data["results"]
+
+
+@pytest.mark.asyncio
+async def test_detect_weak_password():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/detect/text",
+            json={
+                "content": "password123",
+                "detection_type": "weak_password",
+            },
+        )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["result"]["type"] == "weak_password"
+    assert data["result"]["risk_level"] == "high"
+    assert data["result"]["details"]["score"] <= 1
+
+
+@pytest.mark.asyncio
+async def test_detect_weak_password_strong():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/detect/text",
+            json={
+                "content": "Tr0ub4dor&3App!",
+                "detection_type": "weak_password",
+            },
+        )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["result"]["risk_level"] == "low"
+    assert data["result"]["details"]["score"] >= 3
 
 
 @pytest.mark.asyncio
