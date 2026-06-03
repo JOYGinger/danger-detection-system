@@ -85,6 +85,24 @@ async def test_detect_sensitive_info():
 
 
 @pytest.mark.asyncio
+async def test_detect_phishing_email():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/detect/text",
+            json={
+                "content": "紧急：您的微信支付账户即将过期，请立即点击 https://bit.ly/abc123 验证身份",
+                "detection_type": "phishing",
+            },
+        )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["result"]["type"] == "phishing"
+    assert data["result"]["risk_level"] in {"high", "medium"}
+
+
+@pytest.mark.asyncio
 async def test_detect_all_types():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
