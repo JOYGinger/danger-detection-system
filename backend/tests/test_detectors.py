@@ -1,6 +1,7 @@
 import pytest
 from app.detectors import get_detector, detect_all
 from app.detectors.base import BaseDetector, DetectionResult
+from app.detectors.phishing_email import PhishingEmailDetector
 from app.detectors.sensitive_info import SensitiveInfoDetector
 from app.detectors.weak_password import WeakPasswordDetector
 
@@ -20,6 +21,9 @@ class TestDetectorFactory:
     def test_get_weak_password_detector(self):
         detector = get_detector("weak_password")
         assert isinstance(detector, WeakPasswordDetector)
+    def test_get_phishing_detector(self):
+        detector = get_detector("phishing")
+        assert isinstance(detector, PhishingEmailDetector)
 
     def test_get_unknown_detector(self):
         with pytest.raises(ValueError, match="未知"):
@@ -31,6 +35,9 @@ class TestDetectorFactory:
         assert "weak_password" in results
         assert isinstance(results["sensitive_info"], DetectionResult)
         assert isinstance(results["weak_password"], DetectionResult)
+        assert "phishing" in results
+        assert isinstance(results["sensitive_info"], DetectionResult)
+        assert isinstance(results["phishing"], DetectionResult)
 
 
 class TestSensitiveInfoDetector:
@@ -158,3 +165,25 @@ class TestWeakPasswordDetector:
     def test_suggestions_not_empty(self):
         result = self.detector.detect("password123")
         assert len(result.suggestions) > 0
+class TestPhishingEmailDetector:
+    def setup_method(self):
+        self.detector = PhishingEmailDetector()
+
+    def test_phishing_detects_urgency_and_brand_impersonation(self):
+        text = "紧急：您的支付宝账户即将过期，请立即点击链接验证身份"
+        result = self.detector.detect(text)
+        assert result.type == "phishing"
+        assert result.risk_level in {"high", "medium"}
+        assert result.details["signals"]["urgency"] >= 1
+        assert result.details["signals"]["disguise"] >= 1
+
+    def test_phishing_detects_short_link(self):
+        text = "请点击 https://bit.ly/abc123 查看详情"
+        result = self.detector.detect(text)
+        assert result.details["signals"]["short_url"] >= 1
+        assert any(f["type"] == "shortened_url" for f in result.details["findings"])
+
+    def test_phishing_safe_message(self):
+        result = self.detector.detect("这是一封普通通知邮件，仅用于内部沟通")
+        assert result.risk_level == "safe"
+        assert result.details["url_count"] == 0
