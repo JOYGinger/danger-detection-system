@@ -30,6 +30,11 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 function ResultCard({ result }: { result: DetectionResult }) {
+  const isWeakPassword = result.type === 'weak_password'
+  const isSensitiveInfo = result.type === 'sensitive_info'
+  const details = result.details ?? {}
+  const skipped = details.skipped === true
+
   return (
     <div className={`rounded-lg border p-4 ${RISK_COLORS[result.risk_level]}`}>
       <div className="flex items-center justify-between mb-2">
@@ -40,15 +45,55 @@ function ResultCard({ result }: { result: DetectionResult }) {
       </div>
       <p className="text-sm mb-2">置信度: {Math.round(result.confidence * 100)}%</p>
 
-      {result.details && Object.keys(result.details).length > 0 && (
+      {isWeakPassword && !skipped && (
+        <div className="mt-2 text-sm space-y-2">
+          <p>
+            强度评分: {details.score as number} / {details.score_max as number}
+          </p>
+          <div className="w-full bg-white/50 rounded-full h-2">
+            <div
+              className="bg-current h-2 rounded-full transition-all"
+              style={{ width: `${(((details.score as number) + 1) / 5) * 100}%` }}
+            />
+          </div>
+          {details.entropy_bits !== undefined && (
+            <p>估算熵: {details.entropy_bits as number} bits</p>
+          )}
+          {typeof details.crack_time === 'string' && (
+            <p>离线慢哈希破解时间: {details.crack_time}</p>
+          )}
+          {Array.isArray(details.patterns) && (details.patterns as Array<{ label: string; token: string }>).length > 0 && (
+            <div>
+              <p className="font-medium mb-1">检测到的弱模式:</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {(details.patterns as Array<{ label: string; token: string }>).map((p, i) => (
+                  <li key={i}>{p.label}{p.token ? ` (${p.token})` : ''}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {Array.isArray(details.feedback) && (details.feedback as string[]).length > 0 && (
+            <div>
+              <p className="font-medium mb-1">判定依据:</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {(details.feedback as string[]).map((f, i) => (
+                  <li key={i}>{f}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isSensitiveInfo && details && Object.keys(details).length > 0 && (
         <div className="mt-2 text-sm">
           <p className="font-medium mb-1">详细结果:</p>
           <ul className="list-disc list-inside space-y-0.5">
-            {result.details.count !== undefined && (
-              <li>发现 {result.details.count as number} 项敏感信息</li>
+            {details.count !== undefined && (
+              <li>发现 {details.count as number} 项敏感信息</li>
             )}
-            {Array.isArray(result.details.findings) &&
-              (result.details.findings as Array<{ type: string; masked_value: string; risk: string }>).map((f, i) => (
+            {Array.isArray(details.findings) &&
+              (details.findings as Array<{ type: string; masked_value: string; risk: string }>).map((f, i) => (
                 <li key={i}>
                   [{RISK_LABELS[f.risk] || f.risk}] {f.masked_value}
                 </li>
@@ -57,7 +102,11 @@ function ResultCard({ result }: { result: DetectionResult }) {
         </div>
       )}
 
-      {result.suggestions.length > 0 && (
+      {skipped && (
+        <p className="mt-2 text-sm">{result.suggestions[0]}</p>
+      )}
+
+      {result.suggestions.length > 0 && !skipped && (
         <div className="mt-2 text-sm">
           <p className="font-medium mb-1">安全建议:</p>
           <ul className="list-disc list-inside space-y-0.5">
@@ -109,7 +158,11 @@ export default function DetectPage() {
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="请输入要检测的文本内容..."
+            placeholder={
+              detectionType === 'weak_password'
+                ? '请输入待检测的密码...'
+                : '请输入要检测的文本内容...'
+            }
             rows={6}
             className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
           />

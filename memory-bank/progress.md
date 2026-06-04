@@ -1,7 +1,7 @@
 # 项目进度追踪
 
 ## 当前状态
-项目处于 **阶段五完成**，前端全部页面（检测+历史+路由导航）已实现，下一步集成测试。
+项目处于 **阶段三步骤 3.2 完成**，弱密码检测器已实现并注册，下一步钓鱼邮件检测（3.3–3.5）或集成测试。
 
 ---
 
@@ -37,7 +37,7 @@
 
 ### 阶段三：检测器实现
 - [x] 步骤 3.1：实现敏感信息检测器（正则+规则引擎）
-- [ ] 步骤 3.2：实现弱密码检测器（zxcvbn-python）
+- [x] 步骤 3.2：实现弱密码检测器（zxcvbn-python）
 - [ ] 步骤 3.3：准备钓鱼邮件训练数据（CSV格式）
 - [ ] 步骤 3.4：训练钓鱼邮件检测模型
 - [ ] 步骤 3.5：实现钓鱼邮件检测器（TF-IDF + RF）
@@ -102,6 +102,19 @@
 ---
 
 ## 更新日志
+
+### 2026-06-01
+- **步骤 3.2 完成**：实现弱密码检测器
+  - 创建 `backend/app/detectors/weak_password.py`：WeakPasswordDetector
+    - zxcvbn-python 评估 score 0-4，映射 risk_level（high/high/medium/low/low）
+    - details：score/score_max/entropy_bits/guesses/crack_time/feedback/patterns
+    - 弱模式中文标签：字典攻击、键盘连续、重复字符、连续序列、日期模式
+    - suggestions：zxcvbn 反馈中文化 + NIST 长度建议 + 密码学解读（熵、攻击类型）
+    - 全部检测启发式：多行或长度不在 4–128 时跳过，返回 safe + 提示
+  - 更新 `backend/app/detectors/__init__.py`：注册 weak_password
+  - 更新 `backend/tests/test_detectors.py`：新增 7 个弱密码测试 + 工厂测试
+  - 更新 `backend/tests/test_api.py`：新增 weak_password API 测试 2 个
+  - 更新 `frontend/src/pages/DetectPage.tsx`：ResultCard 弱密码专用展示；弱密码 placeholder
 
 ### 2026-05-31
 - **步骤 5.1 完成**：创建API客户端
@@ -311,7 +324,7 @@
 
 ## 下一步计划
 
-1. **阶段六**：集成测试
+1. **阶段三**：钓鱼邮件检测（3.3–3.5）或 **阶段六** 集成测试
 
 ---
 
