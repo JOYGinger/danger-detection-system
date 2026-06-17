@@ -1,0 +1,32 @@
+# Web框架
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pydantic==2.10.0
+pydantic-settings==2.6.0
+python-multipart==0.0.12
+python-dotenv==1.0.1
+
+# 数据库
+sqlalchemy==2.0.36
+aiosqlite==0.20.0
+
+# 数据处理
+pandas==2.2.2
+numpy==2.1.0
+
+# NLP处理 - 钓鱼邮件检测
+scikit-learn==1.5.2
+jieba==0.42.1
+joblib==1.4.2
+regex==2024.9.11
+
+# 密码强度检测 - 使用成熟库
+zxcvbn-python==4.4.2
+
+# 数据加密存储
+cryptography==43.0.0
+
+# 测试
+pytest==8.3.0
+pytest-asyncio==0.24.0
+httpx==0.27.0
